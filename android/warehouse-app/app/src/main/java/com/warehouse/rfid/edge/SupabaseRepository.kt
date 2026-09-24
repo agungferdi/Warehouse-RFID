@@ -1,0 +1,199 @@
+package com.warehouse.rfid.edge
+
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.rpc
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+
+sealed class ApiResult<out T> {
+    data class Success<T>(val value: T) : ApiResult<T>()
+    data class Failure(val message: String) : ApiResult<Nothing>()
+}
+
+data class BatchItemResult(
+    val epc: String,
+    val status: String,
+    val reason: String?,
+    val productName: String?
+)
+
+data class BatchSubmitResult(
+    val acceptedCount: Int,
+    val rejectedCount: Int,
+    val unknownCount: Int,
+    val items: List<BatchItemResult>
+)
+
+@Serializable
+private data class ProductRow(
+    val epc: String,
+    val sku: String,
+    @SerialName("product_name") val productName: String,
+    val quantity: Int,
+    val location: String? = null,
+    val status: String
+)
+
+@Serializable
+private data class LocationRow(val location: String? = null)
+
+@Serializable
+private data class StatusRow(val status: String)
+
+@Serializable
+private data class ActivityRow(
+    @SerialName("activity_type") val activityType: String,
+    @SerialName("activity_time") val activityTime: String
+)
+
+@Serializable
+private data class RpcResult(
+    val epc: String,
+    val status: String,
+    val reason: String? = null,
+    val sku: String? = null,
+    val productName: String? = null,
+    val quantity: Int? = null,
+    val location: String? = null
+)
+
+@Serializable
+private data class RegisterParams(
+    @SerialName("p_epc") val epc: String,
+    @SerialName("p_sku") val sku: String,
+    @SerialName("p_product_name") val productName: String,
+    @SerialName("p_quantity") val quantity: Int,
+    @SerialName("p_location") val location: String?
+)
+
+@Serializable
+private data class LocationParams(
+    @SerialName("p_epc") val epc: String,
+    @SerialName("p_location") val location: String?,
+    @SerialName("p_quantity") val quantity: Int
+)
+
+@Serializable
+private data class DestinationParams(
+    @SerialName("p_epc") val epc: String,
+    @SerialName("p_destination") val destination: String,
+    @SerialName("p_quantity") val quantity: Int
+)
+
+class SupabaseRepository {
+    private val postgrest get() = SupabaseModule.client.postgrest
+
+    suspend fun fetchStats(): ApiResult<DashboardStats> = withContext(Dispatchers.IO) {
+        try {
+            val statusRows = postgrest.from("products").select(columns = Columns.list("status")).decodeList<StatusRow>()
+            val available = statusRows.count { it.status == "available" }
+            val sold = statusRows.count { it.status == "sold" }
+            val inTransit = statusRows.count { it.status == "in_transit" }
+
+            val cutoff = java.time.Instant.now().minus(7, ChronoUnit.DAYS).toString()
+            val activityRows = postgrest.from("activities")
+                .select(columns = Columns.list("activity_type", "activity_time")) {
+                    filter { gte("activity_time", cutoff) }
+                }.decodeList<ActivityRow>()
+
+            val byDate = activityRows.groupBy { it.activityTime.substring(0, 10) }
+            val today = LocalDate.now()
+            val activityDays = (6 downTo 0).map { offset ->
+                val date = today.minusDays(offset.toLong())
+                val key = date.toString()
+                val dayRows = byDate[key] ?: emptyList()
+                ActivityDayCount(
+                    date = key,
+                    inbound = dayRows.count { it.activityType == "inbound" },
+                    stockOpname = dayRows.count { it.activityType == "stock_opname" },
+                    transfer = dayRows.count { it.activityType == "transfer" },
+                    outbound = dayRows.count { it.activityType == "outbound" }
+                )
+            }
+
+            ApiResult.Success(
+                DashboardStats(
+                    available = available,
+                    sold = sold,
+                    inTransit = inTransit,
+                    totalProducts = statusRows.size,
+                    activityDays = activityDays
+                )
+            )
+        } catch (e: Exception) {
+            ApiResult.Failure(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun fetchLocations(): ApiResult<List<String>> = withContext(Dispatchers.IO) {
+        try {
+            val rows = postgrest.from("products").select(columns = Columns.list("location")).decodeList<LocationRow>()
+            val locations = rows.mapNotNull { it.location?.trim()?.ifEmpty { null } }.distinct().sorted()
+            ApiResult.Success(locations)
+        } catch (e: Exception) {
+            ApiResult.Failure(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun lookupProduct(epc: String): ApiResult<ProductLookup?> = withContext(Dispatchers.IO) {
+        try {
+            val row = postgrest.from("products").select {
+                filter { eq("epc", epc.uppercase()) }
+            }.decodeSingleOrNull<ProductRow>()
+            ApiResult.Success(
+                row?.let { ProductLookup(it.sku, it.productName, it.quantity, it.location, it.status) }
+            )
+        } catch (e: Exception) {
+            ApiResult.Failure(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun submitActivityBatch(
+        activityType: ActivityType,
+        location: String?,
+        items: List<TagRow>
+    ): ApiResult<BatchSubmitResult> = withContext(Dispatchers.IO) {
+        try {
+            val results = items.map { tag ->
+                val rpcResult: RpcResult = when (activityType) {
+                    ActivityType.INBOUND -> postgrest.rpc(
+                        "register_product_tag",
+                        RegisterParams(
+                            epc = tag.epc,
+                            sku = tag.sku ?: "",
+                            productName = tag.productName ?: "",
+                            quantity = tag.quantity ?: 1,
+                            location = location
+                        )
+                    ).decodeAs()
+                    ActivityType.STOCK_OPNAME -> postgrest.rpc(
+                        "record_stock_opname",
+                        LocationParams(epc = tag.epc, location = location, quantity = tag.quantity ?: 1)
+                    ).decodeAs()
+                    ActivityType.TRANSFER -> postgrest.rpc(
+                        "record_transfer",
+                        DestinationParams(epc = tag.epc, destination = location ?: "", quantity = tag.quantity ?: 1)
+                    ).decodeAs()
+                    ActivityType.OUTBOUND -> postgrest.rpc(
+                        "record_outbound",
+                        LocationParams(epc = tag.epc, location = location, quantity = tag.quantity ?: 1)
+                    ).decodeAs()
+                }
+                BatchItemResult(rpcResult.epc, rpcResult.status, rpcResult.reason, rpcResult.productName)
+            }
+
+            val accepted = results.count { it.status == "ACCEPTED" }
+            val unknown = results.count { it.status == "UNKNOWN_EPC" }
+            val rejected = results.size - accepted - unknown
+
+            ApiResult.Success(BatchSubmitResult(accepted, rejected, unknown, results))
+        } catch (e: Exception) {
+            ApiResult.Failure(e.message ?: "Network error")
+        }
+    }
+}

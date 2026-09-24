@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ProductStatus {
+  available
+  sold
+  in_transit
+
+  @@map("product_status")
+}
+
+enum ActivityType {
+  inbound
+  stock_opname
+  transfer
+  outbound
+
+  @@map("activity_type_enum")
+}
+
+model Product {
+  epc         String        @id @db.VarChar(64)
+  sku         String        @db.VarChar(64)
+  productName String        @map("product_name") @db.VarChar(255)
+  quantity    Int           @default(1)
+  location    String?       @db.VarChar(100)
+  status      ProductStatus @default(available)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  activities Activity[]
+
+  @@index([sku], map: "idx_products_sku")
+  @@index([status], map: "idx_products_status")
+  @@map("products")
+}
+
+model Activity {
+  activityId   Int          @id @default(autoincrement()) @map("activity_id")
+  epc          String       @db.VarChar(64)
+  activityType ActivityType @map("activity_type")
+  location     String?      @db.VarChar(100)
+  quantity     Int          @default(1)
+  activityTime DateTime     @default(now()) @map("activity_time") @db.Timestamp(6)
+
+  product Product @relation(fields: [epc], references: [epc], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([epc], map: "idx_activities_epc")
+  @@index([activityType], map: "idx_activities_type")
+  @@map("activities")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique @db.VarChar(64)
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model ScanBatch {
+  id            String       @id @default(cuid())
+  clientBatchId String       @unique @map("client_batch_id")
+  activityType  ActivityType @map("activity_type")
+  location      String?      @db.VarChar(100)
+  readerId      String?      @map("reader_id") @db.VarChar(64)
+  operatorName  String?      @map("operator_name") @db.VarChar(100)
+  itemCount     Int          @map("item_count")
+  responseJson  String       @map("response_json")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@map("scan_batches")
+}

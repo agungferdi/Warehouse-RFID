@@ -1,0 +1,28 @@
+<resources>
+    <!-- Brand — a single tone used everywhere (headers, primary actions, selection states) -->
+    <color name="brand_primary">#2B3346</color>
+    <color name="brand_primary_dark">#1C2231</color>
+    <color name="brand_primary_light">#4A5468</color>
+    <color name="chart_tone_3">#7A8598</color>
+    <color name="chart_tone_4">#AEB6C2</color>
+
+    <!-- Surfaces -->
+    <color name="surface_bg">#F5F6F8</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="white">#FFFFFF</color>
+    <color name="divider">#E3E5EA</color>
+
+    <!-- Text -->
+    <color name="text_primary">#15181F</color>
+    <color name="text_secondary">#6B7078</color>
+    <color name="text_muted">#9AA0AA</color>
+    <color name="text_on_brand">#FFFFFF</color>
+    <color name="text_on_brand_muted">#B7BCC8</color>
+
+    <!-- Functional status — meaning, not decoration; kept muted -->
+    <color name="status_available">#1F8A4C</color>
+    <color name="status_sold">#6B7078</color>
+    <color name="status_in_transit">#B07A17</color>
+    <color name="status_unknown">#9AA0AA</color>
+    <color name="status_rejected">#C4372E</color>
+</resources>
