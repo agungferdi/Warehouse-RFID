@@ -51,6 +51,7 @@ class HomeActivity : ComponentActivity() {
                     onRefresh = { refresh() },
                     onTagRegistration = { launchScan(ActivityType.INBOUND) },
                     onRecordActivity = { showRecordActivitySheet = true },
+                    onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                 )
 
                 if (showRecordActivitySheet) {

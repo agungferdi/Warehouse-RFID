@@ -18,7 +18,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,8 +45,6 @@ data class ScanScreenState(
     val activityType: ActivityType,
     val scanState: ScanState,
     val currentPowerDb: Int,
-    val powerMin: Int,
-    val powerMax: Int,
     val locationLabel: String,
     val statusText: String,
     val totalTagsText: String,
@@ -61,8 +58,6 @@ data class ScanScreenState(
 
 class ScanScreenCallbacks(
     val onBack: () -> Unit,
-    val onPowerChange: (Int) -> Unit,
-    val onPowerChangeFinished: () -> Unit,
     val onLocationClick: () -> Unit,
     val onStartPause: () -> Unit,
     val onSend: () -> Unit,
@@ -77,10 +72,6 @@ class ScanScreenCallbacks(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ScanScreen(state: ScanScreenState, callbacks: ScanScreenCallbacks) {
-    val canScan = state.scanState != ScanState.SCANNING &&
-        state.scanState != ScanState.SENDING &&
-        state.scanState != ScanState.INITIALIZING
-
     Scaffold(
         topBar = {
             AppTopBar(
@@ -97,19 +88,6 @@ fun ScanScreen(state: ScanScreenState, callbacks: ScanScreenCallbacks) {
                 .padding(padding)
                 .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Low", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = state.currentPowerDb.toFloat(),
-                    onValueChange = { callbacks.onPowerChange(it.toInt()) },
-                    onValueChangeFinished = callbacks.onPowerChangeFinished,
-                    valueRange = state.powerMin.toFloat()..state.powerMax.toFloat(),
-                    enabled = canScan,
-                    modifier = Modifier.weight(1f).padding(horizontal = Spacing.sm),
-                )
-                Text("High", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-
             SecondaryButton(
                 text = state.locationLabel,
                 onClick = callbacks.onLocationClick,
@@ -431,8 +409,6 @@ private fun ScanScreenPreview() {
                 activityType = ActivityType.INBOUND,
                 scanState = ScanState.PAUSED,
                 currentPowerDb = 5,
-                powerMin = 1,
-                powerMax = 30,
                 locationLabel = "Location: Rack A1",
                 statusText = "Status: PAUSED",
                 totalTagsText = "Total Tags: 2",
@@ -447,7 +423,7 @@ private fun ScanScreenPreview() {
                 bulkRegisterEnabled = false,
             ),
             callbacks = ScanScreenCallbacks(
-                onBack = {}, onPowerChange = {}, onPowerChangeFinished = {}, onLocationClick = {},
+                onBack = {}, onLocationClick = {},
                 onStartPause = {}, onSend = {}, onClear = {}, onSelectAllToggle = {},
                 onBulkRegisterClick = {}, onTagClick = {}, onTagLongPress = {}, onTagSelectToggle = { _, _ -> },
             ),

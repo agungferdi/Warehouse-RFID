@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -54,6 +55,7 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onTagRegistration: () -> Unit,
     onRecordActivity: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -65,6 +67,7 @@ fun HomeScreen(
                     HomeUiState.Loading -> "Loading…"
                 },
                 actions = listOf(
+                    TopBarAction(Icons.Rounded.Settings, "RFID power settings", onSettings),
                     TopBarAction(Icons.Rounded.Refresh, "Refresh", onRefresh),
                 ),
             )
@@ -193,6 +196,7 @@ private fun HomeScreenSuccessPreview() {
             onRefresh = {},
             onTagRegistration = {},
             onRecordActivity = {},
+            onSettings = {},
         )
     }
 }
@@ -206,6 +210,7 @@ private fun HomeScreenDarkPreview() {
             onRefresh = {},
             onTagRegistration = {},
             onRecordActivity = {},
+            onSettings = {},
         )
     }
 }
@@ -214,7 +219,7 @@ private fun HomeScreenDarkPreview() {
 @Composable
 private fun HomeScreenLoadingPreview() {
     WarehouseAppTheme {
-        HomeScreen(uiState = HomeUiState.Loading, onRefresh = {}, onTagRegistration = {}, onRecordActivity = {})
+        HomeScreen(uiState = HomeUiState.Loading, onRefresh = {}, onTagRegistration = {}, onRecordActivity = {}, onSettings = {})
     }
 }
 
@@ -227,6 +232,7 @@ private fun HomeScreenErrorPreview() {
             onRefresh = {},
             onTagRegistration = {},
             onRecordActivity = {},
+            onSettings = {},
         )
     }
 }

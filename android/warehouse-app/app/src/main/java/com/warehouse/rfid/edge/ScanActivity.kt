@@ -81,7 +81,7 @@ class ScanActivity : AppCompatActivity() {
 
         val typeName = intent.getStringExtra(EXTRA_ACTIVITY_TYPE) ?: ActivityType.STOCK_OPNAME.name
         activityType = ActivityType.valueOf(typeName)
-        currentPowerDb = activityType.powerDb
+        currentPowerDb = PowerSettings.getPower(this, activityType)
 
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         val maxAlarmVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
@@ -102,8 +102,6 @@ class ScanActivity : AppCompatActivity() {
                         activityType = activityType,
                         scanState = scanState,
                         currentPowerDb = currentPowerDb,
-                        powerMin = POWER_DB_MIN,
-                        powerMax = POWER_DB_MAX,
                         locationLabel = locationButtonLabel(),
                         statusText = statusText,
                         totalTagsText = totalTagsText,
@@ -117,8 +115,6 @@ class ScanActivity : AppCompatActivity() {
                     callbacks = remember {
                         ScanScreenCallbacks(
                             onBack = { finish() },
-                            onPowerChange = { currentPowerDb = it },
-                            onPowerChangeFinished = { applyPower(currentPowerDb) },
                             onLocationClick = { showLocationSheet = true },
                             onStartPause = { toggleStartPause() },
                             onSend = { sendBatch() },

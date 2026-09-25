@@ -11,14 +11,8 @@ val RECORD_ACTIVITY_TYPES = listOf(ActivityType.STOCK_OPNAME, ActivityType.TRANS
 
 enum class ScanState { INITIALIZING, READY, SCANNING, PAUSED, SENDING, SUCCESS, ERROR }
 
-private const val POWER_DB_REGISTRATION = 5
-private const val POWER_DB_RECORD_ACTIVITY = 30
-
 const val POWER_DB_MIN = 1
 const val POWER_DB_MAX = 30
-
-val ActivityType.powerDb: Int
-    get() = if (this == ActivityType.INBOUND) POWER_DB_REGISTRATION else POWER_DB_RECORD_ACTIVITY
 
 enum class LookupState { PENDING, FOUND, NOT_FOUND }
 
