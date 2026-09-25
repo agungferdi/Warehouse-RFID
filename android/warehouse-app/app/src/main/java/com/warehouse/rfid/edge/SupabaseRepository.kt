@@ -153,6 +153,24 @@ class SupabaseRepository {
         }
     }
 
+    /**
+     * One request for every registered product, keyed by EPC. A record-activity scan can bring
+     * dozens of distinct tags into range within a second or two; querying each EPC individually
+     * means dozens of concurrent round trips competing for the HTTP client's connection pool,
+     * which is what made the SKU/Product Name/Qty columns lag minutes behind the scan. Loading
+     * the whole table once up front turns every subsequent tag match into an in-memory lookup.
+     */
+    suspend fun fetchProductsByEpc(): ApiResult<Map<String, ProductLookup>> = withContext(Dispatchers.IO) {
+        try {
+            val rows = postgrest.from("products").select().decodeList<ProductRow>()
+            ApiResult.Success(
+                rows.associate { it.epc.uppercase() to ProductLookup(it.sku, it.productName, it.quantity, it.location, it.status) }
+            )
+        } catch (e: Exception) {
+            ApiResult.Failure(e.message ?: "Network error")
+        }
+    }
+
     suspend fun submitActivityBatch(
         activityType: ActivityType,
         location: String?,

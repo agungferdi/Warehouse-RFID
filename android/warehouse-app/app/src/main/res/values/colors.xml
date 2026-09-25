@@ -1,10 +1,8 @@
 <resources>
     <!-- Brand — a single tone used everywhere (headers, primary actions, selection states) -->
-    <color name="brand_primary">#2B3346</color>
-    <color name="brand_primary_dark">#1C2231</color>
-    <color name="brand_primary_light">#4A5468</color>
-    <color name="chart_tone_3">#7A8598</color>
-    <color name="chart_tone_4">#AEB6C2</color>
+    <!-- Kept in sync with Blue500/Blue900 in ui/theme/Color.kt -->
+    <color name="brand_primary">#2F5FEE</color>
+    <color name="brand_primary_dark">#0E1F5C</color>
 
     <!-- Surfaces -->
     <color name="surface_bg">#F5F6F8</color>
