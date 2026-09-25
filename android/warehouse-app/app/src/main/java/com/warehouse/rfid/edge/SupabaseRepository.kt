@@ -71,18 +71,20 @@ private data class RegisterParams(
     @SerialName("p_location") val location: String?
 )
 
+// Deliberately no p_quantity: every EPC is 1 physical unit, so record-activity RPCs use the
+// 2-arg overload, which records the product's own already-registered quantity (always 1)
+// rather than letting the client overwrite it. See register_product_tag / RegisterParams for
+// where quantity is actually set — once, at registration.
 @Serializable
 private data class LocationParams(
     @SerialName("p_epc") val epc: String,
-    @SerialName("p_location") val location: String?,
-    @SerialName("p_quantity") val quantity: Int
+    @SerialName("p_location") val location: String?
 )
 
 @Serializable
 private data class DestinationParams(
     @SerialName("p_epc") val epc: String,
-    @SerialName("p_destination") val destination: String,
-    @SerialName("p_quantity") val quantity: Int
+    @SerialName("p_destination") val destination: String
 )
 
 class SupabaseRepository {
@@ -191,15 +193,15 @@ class SupabaseRepository {
                     ).decodeAs()
                     ActivityType.STOCK_OPNAME -> postgrest.rpc(
                         "record_stock_opname",
-                        LocationParams(epc = tag.epc, location = location, quantity = tag.quantity ?: 1)
+                        LocationParams(epc = tag.epc, location = location)
                     ).decodeAs()
                     ActivityType.TRANSFER -> postgrest.rpc(
                         "record_transfer",
-                        DestinationParams(epc = tag.epc, destination = location ?: "", quantity = tag.quantity ?: 1)
+                        DestinationParams(epc = tag.epc, destination = location ?: "")
                     ).decodeAs()
                     ActivityType.OUTBOUND -> postgrest.rpc(
                         "record_outbound",
-                        LocationParams(epc = tag.epc, location = location, quantity = tag.quantity ?: 1)
+                        LocationParams(epc = tag.epc, location = location)
                     ).decodeAs()
                 }
                 BatchItemResult(rpcResult.epc, rpcResult.status, rpcResult.reason, rpcResult.productName)

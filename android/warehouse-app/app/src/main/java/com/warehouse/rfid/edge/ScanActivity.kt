@@ -151,7 +151,7 @@ class ScanActivity : AppCompatActivity() {
                 if (showBulkRegisterSheet) {
                     BulkRegisterSheet(
                         selectedCount = selectedCount,
-                        onApply = { sku, name, qty -> applyBulkRegister(sku, name, qty) },
+                        onApply = { sku, name -> applyBulkRegister(sku, name) },
                         onDismiss = { showBulkRegisterSheet = false },
                     )
                 }
@@ -159,7 +159,7 @@ class ScanActivity : AppCompatActivity() {
                 editingTag?.let { tag ->
                     TagEditSheet(
                         tag = tag,
-                        onSave = { sku, name, qty -> saveTagEdit(tag, sku, name, qty) },
+                        onSave = { sku, name -> saveTagEdit(tag, sku, name) },
                         onDismiss = { editingTag = null },
                     )
                 }
@@ -226,13 +226,15 @@ class ScanActivity : AppCompatActivity() {
         selectionModeEnabled = checked || selectedTags().isNotEmpty()
     }
 
-    private fun applyBulkRegister(sku: String?, name: String, quantity: Int) {
+    // Every registered EPC is exactly one physical unit, so quantity is always 1 per tag —
+    // never entered manually. A SKU's total on-hand count is just how many EPC rows share it.
+    private fun applyBulkRegister(sku: String?, name: String) {
         val selected = selectedTags()
         if (selected.isEmpty()) return
         for (tag in selected) {
             tag.sku = sku
             tag.productName = name
-            tag.quantity = quantity
+            tag.quantity = 1
             tag.isSelected = false
         }
         touchAllTags()
@@ -241,10 +243,10 @@ class ScanActivity : AppCompatActivity() {
         Toast.makeText(this, "Applied to ${selected.size} tag(s)", Toast.LENGTH_SHORT).show()
     }
 
-    private fun saveTagEdit(tag: TagRow, sku: String?, name: String?, quantity: Int) {
+    private fun saveTagEdit(tag: TagRow, sku: String?, name: String?) {
         tag.sku = sku
         tag.productName = name
-        tag.quantity = quantity
+        tag.quantity = 1
         touchTag(tag)
         editingTag = null
     }
@@ -391,7 +393,6 @@ class ScanActivity : AppCompatActivity() {
                     for (tag in tagsState) {
                         if (tag.lookupState == LookupState.PENDING) applyCachedLookup(tag)
                     }
-                    recomputeSkuQuantities()
                     touchAllTags()
                 }
                 is ApiResult.Failure -> Unit // per-tag fallback in lookupTag still works
@@ -415,7 +416,6 @@ class ScanActivity : AppCompatActivity() {
     private fun lookupTag(tag: TagRow) {
         if (productCacheReady) {
             applyCachedLookup(tag)
-            recomputeSkuQuantities()
             touchAllTags()
             return
         }
@@ -437,26 +437,7 @@ class ScanActivity : AppCompatActivity() {
                     tag.lookupState = LookupState.NOT_FOUND
                 }
             }
-            recomputeSkuQuantities()
             touchAllTags()
-        }
-    }
-
-    /**
-     * In record-activity mode, several distinct EPCs can share one SKU. The displayed and
-     * submitted quantity for that SKU is the count of unique EPCs found for it in this
-     * session, not each product's originally registered per-unit quantity.
-     */
-    private fun recomputeSkuQuantities() {
-        if (activityType == ActivityType.INBOUND) return
-        val countsBySku = tagsState
-            .filter { it.lookupState == LookupState.FOUND && !it.sku.isNullOrEmpty() }
-            .groupingBy { it.sku!! }
-            .eachCount()
-        for (tag in tagsState) {
-            if (tag.lookupState == LookupState.FOUND && !tag.sku.isNullOrEmpty()) {
-                tag.quantity = countsBySku[tag.sku] ?: 1
-            }
         }
     }
 

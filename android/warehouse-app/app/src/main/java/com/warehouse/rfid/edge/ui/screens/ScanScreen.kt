@@ -178,20 +178,32 @@ fun ScanScreen(state: ScanScreenState, callbacks: ScanScreenCallbacks) {
                     modifier = Modifier.padding(vertical = Spacing.xl),
                 )
             } else {
+                val displayRows = buildDisplayRows(state.tags, state.isRegistrationMode)
                 TableHeaderRow(showCheckboxSpacer = state.isRegistrationMode)
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = Spacing.xl),
                 ) {
-                    items(state.tags, key = { it.epc }) { tag ->
-                        TagRowItem(
-                            tag = tag,
-                            isRegistrationMode = state.isRegistrationMode,
-                            selectionModeEnabled = state.selectionModeEnabled,
-                            onClick = { callbacks.onTagClick(tag) },
-                            onLongPress = { callbacks.onTagLongPress(tag) },
-                            onSelectToggle = { checked -> callbacks.onTagSelectToggle(tag, checked) },
-                        )
+                    items(
+                        displayRows,
+                        key = { row ->
+                            when (row) {
+                                is DisplayRow.Single -> row.tag.epc
+                                is DisplayRow.Grouped -> "sku:${row.sku}"
+                            }
+                        },
+                    ) { row ->
+                        when (row) {
+                            is DisplayRow.Single -> TagRowItem(
+                                tag = row.tag,
+                                isRegistrationMode = state.isRegistrationMode,
+                                selectionModeEnabled = state.selectionModeEnabled,
+                                onClick = { callbacks.onTagClick(row.tag) },
+                                onLongPress = { callbacks.onTagLongPress(row.tag) },
+                                onSelectToggle = { checked -> callbacks.onTagSelectToggle(row.tag, checked) },
+                            )
+                            is DisplayRow.Grouped -> GroupedSkuRowItem(row)
+                        }
                     }
                 }
             }
@@ -237,6 +249,41 @@ private fun isUnknownTag(tag: TagRow, isRegistrationMode: Boolean): Boolean =
     } else {
         tag.lookupState == LookupState.NOT_FOUND || tag.status == "UNKNOWN_EPC"
     }
+
+private sealed interface DisplayRow {
+    data class Single(val tag: TagRow) : DisplayRow
+    data class Grouped(val sku: String, val productName: String, val tags: List<TagRow>) : DisplayRow
+}
+
+/**
+ * Record-activity mode: several distinct EPCs sharing one SKU collapse into a single row with
+ * Qty = how many tags share it, instead of one row per EPC. Registration mode is untouched —
+ * each physical tag being registered stays its own row. A tag that already has a send result
+ * (status set) always renders on its own row too, so per-EPC accept/reject outcomes stay visible
+ * after Send rather than being hidden inside a group.
+ */
+private fun buildDisplayRows(tags: List<TagRow>, isRegistrationMode: Boolean): List<DisplayRow> {
+    if (isRegistrationMode) return tags.map { DisplayRow.Single(it) }
+
+    fun isGroupable(tag: TagRow) =
+        tag.lookupState == LookupState.FOUND && !tag.sku.isNullOrEmpty() && tag.status.isNullOrEmpty()
+
+    val bySku = tags.filter(::isGroupable).groupBy { it.sku!! }
+    val emittedSkus = mutableSetOf<String>()
+    val rows = mutableListOf<DisplayRow>()
+    for (tag in tags) {
+        if (isGroupable(tag)) {
+            val sku = tag.sku!!
+            if (emittedSkus.add(sku)) {
+                val group = bySku.getValue(sku)
+                rows += DisplayRow.Grouped(sku, group.first().productName.orEmpty(), group)
+            }
+        } else {
+            rows += DisplayRow.Single(tag)
+        }
+    }
+    return rows
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -328,6 +375,37 @@ private fun TagRowItem(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+/** One row per SKU in record-activity mode: Qty is how many distinct EPCs matched this SKU. */
+@Composable
+private fun GroupedSkuRowItem(row: DisplayRow.Grouped) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.xs),
+    ) {
+        Text(
+            "${row.tags.size} tag${if (row.tags.size == 1) "" else "s"} matched",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TableCell(row.sku, Modifier.weight(SkuColumnWeight))
+            Text(
+                row.productName,
+                modifier = Modifier.weight(ProductColumnWeight),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TableCell(row.tags.size.toString(), Modifier.weight(QtyColumnWeight))
         }
     }
 }

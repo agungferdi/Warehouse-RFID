@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -22,7 +21,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import com.warehouse.rfid.edge.TagRow
 import com.warehouse.rfid.edge.ui.components.PrimaryButton
 import com.warehouse.rfid.edge.ui.components.WarehouseListItem
@@ -85,12 +83,11 @@ fun LocationPickerSheet(
 @Composable
 fun BulkRegisterSheet(
     selectedCount: Int,
-    onApply: (sku: String?, name: String, quantity: Int) -> Unit,
+    onApply: (sku: String?, name: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var sku by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
-    var quantity by remember { mutableStateOf("1") }
     var nameError by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -125,14 +122,10 @@ fun BulkRegisterSheet(
                 supportingText = if (nameError) { { Text("Product name is required") } } else null,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.sm))
-            OutlinedTextField(
-                value = quantity,
-                onValueChange = { quantity = it.filter(Char::isDigit) },
-                label = { Text("Quantity per tag") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
+            Text(
+                "Quantity isn't entered here — each tag counts as 1 unit, and a SKU's total is however many tags share it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.lg))
 
@@ -142,7 +135,7 @@ fun BulkRegisterSheet(
                     if (name.isBlank()) {
                         nameError = true
                     } else {
-                        onApply(sku.trim().ifBlank { null }, name.trim(), quantity.toIntOrNull()?.takeIf { it > 0 } ?: 1)
+                        onApply(sku.trim().ifBlank { null }, name.trim())
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -156,12 +149,11 @@ fun BulkRegisterSheet(
 @Composable
 fun TagEditSheet(
     tag: TagRow,
-    onSave: (sku: String?, name: String?, quantity: Int) -> Unit,
+    onSave: (sku: String?, name: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var sku by remember { mutableStateOf(tag.sku.orEmpty()) }
     var name by remember { mutableStateOf(tag.productName.orEmpty()) }
-    var quantity by remember { mutableStateOf((tag.quantity ?: 1).toString()) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -193,25 +185,12 @@ fun TagEditSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.sm))
-            OutlinedTextField(
-                value = quantity,
-                onValueChange = { quantity = it.filter(Char::isDigit) },
-                label = { Text("Quantity") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
             Spacer(Modifier.height(Spacing.lg))
 
             PrimaryButton(
                 text = "Save",
                 onClick = {
-                    onSave(
-                        sku.trim().ifBlank { null },
-                        name.trim().ifBlank { null },
-                        quantity.toIntOrNull()?.takeIf { it > 0 } ?: 1,
-                    )
+                    onSave(sku.trim().ifBlank { null }, name.trim().ifBlank { null })
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
