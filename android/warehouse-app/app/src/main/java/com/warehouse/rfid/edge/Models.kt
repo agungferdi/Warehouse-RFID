@@ -57,8 +57,18 @@ data class DashboardStats(
     val sold: Int,
     val inTransit: Int,
     val totalProducts: Int,
-    val activityDays: List<ActivityDayCount>
+    val activityDays: List<ActivityDayCount>,
+    val locationStats: List<LocationStockStats> = emptyList(),
 )
+
+data class LocationStockStats(
+    val location: String,
+    val available: Int,
+    val sold: Int,
+    val inTransit: Int,
+) {
+    val total: Int get() = available + sold + inTransit
+}
 
 data class ActivityDayCount(
     val date: String,

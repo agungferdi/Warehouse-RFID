@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,10 +23,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.warehouse.rfid.edge.ActivityDayCount
 import com.warehouse.rfid.edge.DashboardStats
+import com.warehouse.rfid.edge.LocationStockStats
 import com.warehouse.rfid.edge.ui.components.ActivityColumnChart
 import com.warehouse.rfid.edge.ui.components.AppTopBar
 import com.warehouse.rfid.edge.ui.components.ChartSeries
 import com.warehouse.rfid.edge.ui.components.ErrorState
+import com.warehouse.rfid.edge.ui.components.LocationDonutCard
 import com.warehouse.rfid.edge.ui.components.PrimaryButton
 import com.warehouse.rfid.edge.ui.components.ProportionSegment
 import com.warehouse.rfid.edge.ui.components.ProportionSummary
@@ -140,6 +143,29 @@ private fun HomeContent(stats: DashboardStats) {
         }
     }
 
+    if (stats.locationStats.isNotEmpty()) {
+        WarehouseCard {
+            Text("Stock by location", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Spacing.md))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                for (location in stats.locationStats) {
+                    LocationDonutCard(
+                        location = location.location,
+                        segments = listOf(
+                            ProportionSegment("Available", location.available, MaterialTheme.colorScheme.primary),
+                            ProportionSegment("Sold", location.sold, MaterialTheme.colorScheme.onSurfaceVariant),
+                            ProportionSegment("In Transit", location.inTransit, WarehouseTheme.extendedColors.warning),
+                        ),
+                        total = location.total,
+                    )
+                }
+            }
+        }
+    }
+
     WarehouseCard {
         if (stats.activityDays.isEmpty() || stats.activityDays.all { it.inbound + it.stockOpname + it.transfer + it.outbound == 0 }) {
             ErrorState(title = "No activity yet", message = "Activity from the last 7 days will appear here.")
@@ -218,5 +244,9 @@ private fun fakeStats() = DashboardStats(
         ActivityDayCount("09-22", 3, 1, 2, 1),
         ActivityDayCount("09-23", 5, 0, 1, 2),
         ActivityDayCount("09-24", 8, 3, 0, 4),
+    ),
+    locationStats = listOf(
+        LocationStockStats("Rack A1", available = 60, sold = 20, inTransit = 3),
+        LocationStockStats("Rack B2", available = 68, sold = 22, inTransit = 4),
     ),
 )

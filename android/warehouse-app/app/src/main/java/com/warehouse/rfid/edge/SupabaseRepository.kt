@@ -43,7 +43,7 @@ private data class ProductRow(
 private data class LocationRow(val location: String? = null)
 
 @Serializable
-private data class StatusRow(val status: String)
+private data class StatusRow(val status: String, val location: String? = null)
 
 @Serializable
 private data class ActivityRow(
@@ -92,10 +92,22 @@ class SupabaseRepository {
 
     suspend fun fetchStats(): ApiResult<DashboardStats> = withContext(Dispatchers.IO) {
         try {
-            val statusRows = postgrest.from("products").select(columns = Columns.list("status")).decodeList<StatusRow>()
+            val statusRows = postgrest.from("products").select(columns = Columns.list("status", "location")).decodeList<StatusRow>()
             val available = statusRows.count { it.status == "available" }
             val sold = statusRows.count { it.status == "sold" }
             val inTransit = statusRows.count { it.status == "in_transit" }
+
+            val locationStats = statusRows
+                .groupBy { it.location?.trim()?.ifEmpty { null } ?: "Unassigned" }
+                .map { (location, rows) ->
+                    LocationStockStats(
+                        location = location,
+                        available = rows.count { it.status == "available" },
+                        sold = rows.count { it.status == "sold" },
+                        inTransit = rows.count { it.status == "in_transit" },
+                    )
+                }
+                .sortedBy { it.location }
 
             val cutoff = java.time.Instant.now().minus(7, ChronoUnit.DAYS).toString()
             val activityRows = postgrest.from("activities")
@@ -124,7 +136,8 @@ class SupabaseRepository {
                     sold = sold,
                     inTransit = inTransit,
                     totalProducts = statusRows.size,
-                    activityDays = activityDays
+                    activityDays = activityDays,
+                    locationStats = locationStats,
                 )
             )
         } catch (e: Exception) {
